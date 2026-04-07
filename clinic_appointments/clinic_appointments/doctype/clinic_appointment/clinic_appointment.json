@@ -1,0 +1,85 @@
+{
+ "actions": [],
+ "autoname": "format:CA-{YYYY}-{MM}-{DD}-{####}",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+
+ "field_order": [
+  "patient_section",
+  "patient",
+  "patient_name",
+  "mobile_number",
+  "alternate_mobile",
+  "patient_gender",
+  "patient_id",
+  "department",
+  "remarks",  
+  "column_break_1",
+  "appointment_status",
+  "duplicate_override",
+  "duplicate_override_reason",
+  "practitioner",
+  "appointment_date",
+  "appointment_time",  
+  "team",
+  "lead_reference",
+  "encounter_reference"
+ ],
+
+ "fields": [
+  {"fieldname": "patient_section", "fieldtype": "Section Break", "label": "Patient & Appointment"},
+
+  {"fieldname": "patient", "fieldtype": "Link", "label": "Patient", "options": "Patient", "in_list_view": 1},
+  {"fieldname": "patient_name", "fieldtype": "Data", "label": "Patient Name", "reqd": 1, "in_list_view": 1},
+  {"fieldname": "mobile_number", "fieldtype": "Data", "label": "Mobile Number", "reqd": 1, "in_list_view": 1},
+  {"fieldname": "alternate_mobile", "fieldtype": "Data", "label": "Alternate Mobile"},
+  {"fieldname": "patient_gender", "fieldtype": "Data", "label": "Gender", "read_only": 1},
+  {"fieldname": "patient_id", "fieldtype": "Data", "label": "Patient ID", "read_only": 1},
+  {"fieldname": "department", "fieldtype": "Link", "label": "Patient Department", "options": "Medical Department", "read_only": 1},
+
+  {"fieldname": "remarks", "fieldtype": "Small Text", "label": "Remarks"},
+
+  {"fieldname": "column_break_1", "fieldtype": "Column Break"},
+
+  {"fieldname": "appointment_status", "fieldtype": "Select", "label": "Appointment Status",
+   "options": "Draft\nScheduled\nConfirmed\nChecked In\nConsulted\nCompleted\nCancelled\nNo Show",
+   "default": "Draft", "reqd": 1, "in_list_view": 1},
+  {"fieldname": "duplicate_override", "fieldtype": "Check", "label": "Allow Duplicate Appointment"},
+  {"fieldname": "duplicate_override_reason", "fieldtype": "Small Text",
+   "label": "Duplicate Override Reason",
+   "depends_on": "eval:doc.duplicate_override==1",
+   "mandatory_depends_on": "eval:doc.duplicate_override==1"},
+
+  {"fieldname": "practitioner", "fieldtype": "Link", "label": "Appointment With", "options": "Healthcare Practitioner", "reqd": 1, "in_list_view": 1},
+  {"fieldname": "appointment_date", "fieldtype": "Date", "label": "Appointment Date", "reqd": 1, "in_list_view": 1},
+  {"fieldname": "appointment_time", "fieldtype": "Time", "label": "Appointment Time", "reqd": 1, "in_list_view": 1},
+  {"fieldname": "team", "fieldtype": "Data", "label": "Team"},
+
+  {"fieldname": "lead_reference", "fieldtype": "Link", "label": "Lead Reference", "options": "CRM Lead"},
+  {"fieldname": "encounter_reference", "fieldtype": "Link", "label": "Encounter Reference", "options": "Patient Encounter", "read_only": 1}
+ ],
+
+ "indexes": [
+  ["appointment_date", "appointment_status"],
+  ["practitioner", "appointment_date", "appointment_time"]
+ ],
+
+ "module": "Clinic Appointments",
+ "name": "Clinic Appointment",
+ "naming_rule": "Expression",
+
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "print": 1,
+   "email": 1,
+   "report": 1,
+   "export": 1,
+   "share": 1
+  }
+ ]
+}
