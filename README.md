@@ -24,7 +24,7 @@ Install the app using the **Bench CLI**.
 ```bash
 cd $PATH_TO_YOUR_BENCH
 
-bench get-app https://github.com/YOUR_GITHUB_USERNAME/clinic_appointments.git --branch develop
+bench get-app https://github.com/YOUR_GITHUB_USERNAME/clinic_appointments.git
 
 bench --site <your-site-name> install-app clinic_appointments
 
