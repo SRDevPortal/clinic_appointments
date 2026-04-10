@@ -2,17 +2,42 @@
 
 Appointment control app integrated with patient encounter workflow
 
-### Installation
+---
 
-You can install this app using the [bench](https://github.com/frappe/bench) CLI:
+## Features
+
+---
+
+## Requirements
+
+- **Frappe Framework** v15+
+- **ERPNext** v15+
+- **Python** 3.10+
+- **Bench CLI**
+
+---
+
+## Installation
+
+Install the app using the **Bench CLI**.
 
 ```bash
 cd $PATH_TO_YOUR_BENCH
-bench get-app $URL_OF_THIS_REPO --branch develop
-bench install-app clinic_appointments
+
+bench get-app https://github.com/YOUR_GITHUB_USERNAME/clinic_appointments.git --branch develop
+
+bench --site <your-site-name> install-app clinic_appointments
+
+bench --site <your-site-name> migrate
+
+bench build
+
+bench restart
 ```
 
-### Contributing
+---
+
+## Contributing
 
 This app uses `pre-commit` for code formatting and linting. Please [install pre-commit](https://pre-commit.com/#installation) and enable it for this repository:
 
@@ -28,6 +53,8 @@ Pre-commit is configured to use the following tools for checking and formatting 
 - prettier
 - pyupgrade
 
-### License
+---
 
-mit
+## License
+
+MIT
