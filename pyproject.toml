@@ -1,5 +1,6 @@
 [project]
 name = "clinic_appointments"
+version = "0.0.1"
 description = "Appointment control app integrated with patient encounter workflow"
 authors = [
     { name = "Admin", email = "admin@example.com"}
