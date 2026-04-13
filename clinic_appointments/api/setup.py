@@ -18,7 +18,7 @@ def get_setup_status():
                 "mobile_number",
                 "appointment_date",
                 "appointment_status",
-                "linked_encounter",
+                "encounter_reference",
                 "practitioner",
                 "modified",
             ],
