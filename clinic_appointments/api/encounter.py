@@ -1,12 +1,24 @@
 import frappe
+from frappe.utils import cstr
+
+from clinic_appointments.utils.sync_audit import add_sync_comment, get_changed_fields
 from clinic_appointments.utils.field_mapper import map_appointment_to_encounter
+from clinic_appointments.utils.sync_mapper import (
+    build_appointment_payload_from_encounter,
+    build_encounter_payload_from_appointment,
+)
 
 
-# =====================================================
-# APPOINTMENT → ENCOUNTER
-# =====================================================
+def _active_status_filters():
+    return ["Scheduled", "Confirmed", "Checked In", "Consulted"]
+
+
+def _apply_encounter_updates(encounter, updates):
+    for fieldname, value in updates.items():
+        encounter.set(fieldname, value)
+
+
 def create_encounter_from_appointment(doc):
-
     if getattr(doc, "encounter_reference", None):
         return
 
@@ -24,18 +36,12 @@ def create_encounter_from_appointment(doc):
         if not doc.practitioner:
             frappe.throw("Practitioner is required to create Encounter")
 
-        enc.patient = doc.patient
-        enc.practitioner = doc.practitioner
+        _apply_encounter_updates(enc, build_encounter_payload_from_appointment(doc))
         enc.company = getattr(doc, "company", None)
 
-        enc.sr_encounter_type = "Appointment"
-        enc.sr_encounter_place = "OPD"
-
-        enc.pe_practitioner = doc.practitioner
-        enc.pe_appointment_date = doc.appointment_date
-        enc.pe_appointment_time = doc.appointment_time
-
+        enc.flags.skip_clinic_appointment_sync = True
         enc.insert(ignore_permissions=True)
+        add_sync_comment(enc, "Clinic Appointment", doc.name, build_encounter_payload_from_appointment(doc).keys())
 
         doc.db_set("encounter_reference", enc.name, update_modified=False)
 
@@ -46,12 +52,8 @@ def create_encounter_from_appointment(doc):
         raise
 
 
-# =====================================================
-# ENCOUNTER → APPOINTMENT
-# =====================================================
 @frappe.whitelist()
 def create_appointment_from_encounter(data):
-
     data = frappe.parse_json(data)
 
     encounter = data.get("encounter")
@@ -68,21 +70,13 @@ def create_appointment_from_encounter(data):
     if not practitioner or not date or not time:
         return
 
-    # ✅ SAFE EXISTING LOOKUP
-    existing = frappe.db.get_value(
-        "Clinic Appointment",
-        {"encounter_reference": encounter},
-        "name"
-    )
+    existing = frappe.db.get_value("Clinic Appointment", {"encounter_reference": encounter}, "name")
 
-    # -----------------------------
-    # 🚫 SLOT CONFLICT CHECK
-    # -----------------------------
     conflict_filters = {
         "practitioner": practitioner,
         "appointment_date": date,
         "appointment_time": time,
-        "appointment_status": ["in", ["Scheduled", "Confirmed", "Checked In", "Consulted"]],
+        "appointment_status": ["in", _active_status_filters()],
     }
 
     if existing:
@@ -91,96 +85,87 @@ def create_appointment_from_encounter(data):
     conflict = frappe.db.exists("Clinic Appointment", conflict_filters)
 
     if conflict:
-        frappe.throw("⚠️ This slot is already booked")
+        frappe.throw("This slot is already booked")
 
-    # -----------------------------
-    # 🔁 UPDATE EXISTING
-    # -----------------------------
+    payload = build_appointment_payload_from_encounter(encounter_doc)
+    payload.update(
+        {
+            "patient": data.get("patient") or payload.get("patient"),
+            "practitioner": practitioner,
+            "appointment_date": date,
+            "appointment_time": time,
+            "encounter_reference": encounter,
+        }
+    )
+
     if existing:
         appt = frappe.get_doc("Clinic Appointment", existing)
-
-        if data.get("patient"):
-            appt.patient = data.get("patient")
-
-        appt.practitioner = practitioner
-        appt.appointment_date = date
-        appt.appointment_time = time
-        appt.encounter_reference = encounter
-
+        changed_fields = get_changed_fields(appt, payload)
+        appt.update(payload)
+        appt.flags.skip_encounter_sync = True
         appt.flags.ignore_validate = True
         appt.save(ignore_permissions=True)
-
+        add_sync_comment(appt, "Patient Encounter", encounter, changed_fields)
         return appt.name
 
-    # -----------------------------
-    # 🆕 CREATE NEW
-    # -----------------------------
     appt = frappe.new_doc("Clinic Appointment")
-
-    appt.patient = data.get("patient")
-    appt.practitioner = practitioner
-    appt.appointment_date = date
-    appt.appointment_time = time
-    appt.status = "Scheduled"
-    appt.encounter_reference = encounter
-
+    appt.update(payload)
+    appt.appointment_status = payload.get("appointment_status") or "Scheduled"
+    appt.flags.skip_encounter_sync = True
     appt.flags.ignore_validate = True
     appt.insert(ignore_permissions=True)
+    add_sync_comment(appt, "Patient Encounter", encounter, payload.keys())
 
     encounter_doc.db_set("encounter_reference", appt.name, update_modified=False)
 
     return appt.name
 
 
-# =====================================================
-# INTERNAL HELPER
-# =====================================================
 def _create_or_update_from_encounter(doc):
-
     if not doc.pe_practitioner or not doc.pe_appointment_date or not doc.pe_appointment_time:
         return
 
-    create_appointment_from_encounter({
-        "patient": doc.patient,
-        "practitioner": doc.pe_practitioner,
-        "appointment_date": doc.pe_appointment_date,
-        "appointment_time": doc.pe_appointment_time,
-        "encounter": doc.name
-    })
+    create_appointment_from_encounter(
+        {
+            "patient": doc.patient,
+            "practitioner": doc.pe_practitioner,
+            "appointment_date": doc.pe_appointment_date,
+            "appointment_time": doc.pe_appointment_time,
+            "encounter": doc.name,
+        }
+    )
 
 
-# =====================================================
-# SYNC APPOINTMENT → ENCOUNTER
-# =====================================================
 def sync_encounter_from_appointment(doc):
-
     if not getattr(doc, "encounter_reference", None):
         return
 
     try:
         enc = frappe.get_doc("Patient Encounter", doc.encounter_reference)
+        updates = build_encounter_payload_from_appointment(doc)
+        changed_fields = get_changed_fields(enc, updates)
 
-        enc.pe_practitioner = doc.practitioner
-        enc.pe_appointment_date = doc.appointment_date
-        enc.pe_appointment_time = doc.appointment_time
+        _apply_encounter_updates(enc, updates)
 
-        # 🔥 LOOP SAFE
         enc.flags.ignore_validate = True
         enc.flags.ignore_links = True
+        enc.flags.skip_clinic_appointment_sync = True
         enc.save(ignore_permissions=True)
+        add_sync_comment(enc, "Clinic Appointment", doc.name, changed_fields)
 
     except Exception:
         frappe.log_error(frappe.get_traceback(), "Encounter Sync Failed")
 
 
-# =====================================================
-# APPOINTMENT HOOKS
-# =====================================================
 def after_insert(doc, method):
-
     try:
+        if getattr(doc.flags, "skip_encounter_sync", False):
+            return
+
         if not getattr(doc, "encounter_reference", None):
             create_encounter_from_appointment(doc)
+        else:
+            sync_encounter_from_appointment(doc)
 
     except Exception:
         frappe.log_error(frappe.get_traceback(), "Auto Encounter Creation Failed")
@@ -188,12 +173,11 @@ def after_insert(doc, method):
 
 
 def on_update(doc, method):
-
     try:
-        if (
-            doc.appointment_status == "Checked In"
-            and not getattr(doc, "encounter_reference", None)
-        ):
+        if getattr(doc.flags, "skip_encounter_sync", False):
+            return
+
+        if doc.appointment_status == "Checked In" and not getattr(doc, "encounter_reference", None):
             create_encounter_from_appointment(doc)
 
         sync_encounter_from_appointment(doc)
@@ -203,21 +187,13 @@ def on_update(doc, method):
         raise
 
 
-# =====================================================
-# ENCOUNTER HOOKS
-# =====================================================
 def after_insert_encounter(doc, method):
-    """
-    Disabled to prevent early duplicate creation
-    """
     return
 
 
 def on_update_encounter(doc, method):
-
     try:
-        # 🔥 IMPORTANT: DO NOT create appointment if already linked
-        if doc.encounter_reference:
+        if cstr(getattr(doc, "encounter_reference", None)).strip():
             return
 
         if doc.sr_encounter_type != "Appointment":
