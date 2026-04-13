@@ -1,4 +1,13 @@
 frappe.ui.form.on("Patient Encounter", {
+    refresh(frm) {
+        toggle_google_calendar_event_id(frm);
+    },
+    sr_encounter_type(frm) {
+        toggle_google_calendar_event_id(frm);
+    },
+    sr_encounter_place(frm) {
+        toggle_google_calendar_event_id(frm);
+    },
     pe_practitioner(frm) {
         trigger_slot_dialog(frm);
     },
@@ -6,6 +15,17 @@ frappe.ui.form.on("Patient Encounter", {
         trigger_slot_dialog(frm);
     }
 });
+
+function toggle_google_calendar_event_id(frm) {
+    const isSystemManager = frappe.user.has_role("System Manager");
+    const isOnlineAppointment =
+        frm.doc.sr_encounter_type === "Appointment" &&
+        frm.doc.sr_encounter_place === "Online";
+
+    frm.set_df_property("google_meet_link", "read_only", 1);
+    frm.toggle_display("google_calendar_event_id", isSystemManager && isOnlineAppointment);
+    frm.set_df_property("google_calendar_event_id", "read_only", 1);
+}
 
 
 // -----------------------------
