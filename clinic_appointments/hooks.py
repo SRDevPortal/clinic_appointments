@@ -9,10 +9,10 @@ app_license = "MIT"
 # APP INCLUDE (Global JS/CSS)
 # ----------------------------------------
 
-app_include_js = [
-    "/assets/clinic_appointments/js/clinic_appointment.js",
-    # "/assets/clinic_appointments/js/crm_lead.js",
-]
+# app_include_js = [
+#     "/assets/clinic_appointments/js/clinic_appointment.js",
+#     "/assets/clinic_appointments/js/crm_lead.js",
+# ]
 
 # ----------------------------------------
 # DOCTYPE JS (Form-level JS)
@@ -20,6 +20,7 @@ app_include_js = [
 
 doctype_js = {
     "Clinic Appointment": "public/js/clinic_appointment.js",
+    "Patient Encounter": "public/js/patient_encounter.js",
 }
 
 # ----------------------------------------
@@ -28,13 +29,13 @@ doctype_js = {
 doc_events = {
     "Clinic Appointment": {
         "after_insert": "clinic_appointments.api.encounter.after_insert",
-        # "on_update": "clinic_appointments.api.encounter.on_update"
-    }
+        "on_update": "clinic_appointments.api.encounter.on_update"
+    },
     # 🔥 Sync Appointment from Patient Encounter
-    # "Patient Encounter": {
-    #     "after_insert": "clinic_appointments.api.encounter_sync.create_or_update_clinic_appointment_from_encounter",
-    #     "on_update": "clinic_appointments.api.encounter_sync.create_or_update_clinic_appointment_from_encounter",
-    # }
+    "Patient Encounter": {
+        "after_insert": "clinic_appointments.api.encounter_sync.create_or_update_clinic_appointment_from_encounter",
+        "on_update": "clinic_appointments.api.encounter_sync.create_or_update_clinic_appointment_from_encounter",
+    }
 }
 
 # ----------------------------------------
@@ -43,9 +44,9 @@ doc_events = {
 
 scheduler_events = {
     # Example: auto update status (No Show, etc.)
-    "hourly": [
-        # "clinic_appointments.api.scheduler.update_appointment_status"
-    ],
+    # "hourly": [
+    #     "clinic_appointments.api.scheduler.update_appointment_status"
+    # ],
 }
 
 # ----------------------------------------
