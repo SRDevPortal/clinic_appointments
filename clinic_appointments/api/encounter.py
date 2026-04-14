@@ -1,5 +1,5 @@
 import frappe
-from frappe.utils import cstr
+from frappe.utils import cstr, get_datetime, getdate, now_datetime
 
 from clinic_appointments.utils.sync_audit import add_sync_comment, get_changed_fields
 from clinic_appointments.utils.field_mapper import map_appointment_to_encounter
@@ -11,6 +11,19 @@ from clinic_appointments.utils.sync_mapper import (
 
 def _active_status_filters():
     return ["Scheduled", "Confirmed", "Checked In", "Consulted"]
+
+
+def _validate_future_appointment(date, time=None):
+    appointment_date = getdate(date)
+    today = getdate(now_datetime())
+
+    if appointment_date < today:
+        frappe.throw("Appointment date cannot be in the past")
+
+    if time:
+        appointment_datetime = get_datetime(f"{appointment_date} {time}")
+        if appointment_datetime < now_datetime():
+            frappe.throw("Appointment time cannot be in the past")
 
 
 def _apply_encounter_updates(encounter, updates):
@@ -69,6 +82,8 @@ def create_appointment_from_encounter(data):
 
     if not practitioner or not date or not time:
         return
+
+    _validate_future_appointment(date, time)
 
     existing = frappe.db.get_value("Clinic Appointment", {"encounter_reference": encounter}, "name")
 
