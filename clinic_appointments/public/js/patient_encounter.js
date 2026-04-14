@@ -1,5 +1,6 @@
 frappe.ui.form.on("Patient Encounter", {
     refresh(frm) {
+        apply_appointment_date_rules(frm);
         toggle_google_calendar_event_id(frm);
     },
     sr_encounter_type(frm) {
@@ -9,12 +10,24 @@ frappe.ui.form.on("Patient Encounter", {
         toggle_google_calendar_event_id(frm);
     },
     pe_practitioner(frm) {
+        reset_appointment_time(frm);
         trigger_slot_dialog(frm);
     },
     pe_appointment_date(frm) {
+        if (!enforce_future_appointment_date(frm, "pe_appointment_date")) return;
+        reset_appointment_time(frm);
         trigger_slot_dialog(frm);
     }
 });
+
+function apply_appointment_date_rules(frm) {
+    const field = frm.fields_dict.pe_appointment_date;
+    const today = frappe.datetime.get_today();
+
+    if (field?.datepicker?.update) {
+        field.datepicker.update({ minDate: today });
+    }
+}
 
 function toggle_google_calendar_event_id(frm) {
     const isSystemManager = frappe.user.has_role("System Manager");
@@ -25,6 +38,26 @@ function toggle_google_calendar_event_id(frm) {
     frm.set_df_property("google_meet_link", "read_only", 1);
     frm.toggle_display("google_calendar_event_id", isSystemManager && isOnlineAppointment);
     frm.set_df_property("google_calendar_event_id", "read_only", 1);
+}
+
+function enforce_future_appointment_date(frm, fieldname) {
+    const value = frm.doc[fieldname];
+    if (!value) return true;
+
+    const today = frappe.datetime.get_today();
+    if (value < today) {
+        frappe.msgprint(__("Appointment date cannot be in the past."));
+        frm.set_value(fieldname, null);
+        return false;
+    }
+
+    return true;
+}
+
+function reset_appointment_time(frm) {
+    if (frm.doc.pe_appointment_time) {
+        frm.set_value("pe_appointment_time", null);
+    }
 }
 
 
@@ -55,6 +88,7 @@ function trigger_slot_dialog(frm) {
 // SLOT DIALOG
 // -----------------------------
 function open_slot_dialog(frm) {
+    if (!enforce_future_appointment_date(frm, "pe_appointment_date")) return;
 
     frappe.call({
         method: "clinic_appointments.api.setup.get_available_slots",
