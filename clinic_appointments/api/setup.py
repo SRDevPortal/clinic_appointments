@@ -1,5 +1,5 @@
 import frappe
-from frappe.utils import getdate
+from frappe.utils import getdate, now_datetime
 
 
 @frappe.whitelist()
@@ -112,6 +112,9 @@ def get_available_slots(practitioner, appointment_date):
     from frappe.utils import getdate
 
     appointment_date = getdate(appointment_date)
+    if appointment_date < getdate(now_datetime()):
+        frappe.throw("Appointment date cannot be in the past")
+
     day = appointment_date.strftime("%A")
 
     practitioner_doc = frappe.get_doc("Healthcare Practitioner", practitioner)
