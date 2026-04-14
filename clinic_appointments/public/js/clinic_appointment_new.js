@@ -3,6 +3,7 @@ frappe.ui.form.on('Clinic Appointment', {
 	refresh(frm) {
 		// 🔒 Disable manual time
 		frm.set_df_property('appointment_time', 'read_only', 1);
+		apply_appointment_date_rules(frm);
 
 		if (frm.doc.patient) {
 			set_patient_values(frm);
@@ -18,13 +19,25 @@ frappe.ui.form.on('Clinic Appointment', {
 	},
 
 	practitioner(frm) {
+		reset_appointment_time(frm);
 		trigger_slot_dialog(frm);
 	},
 
 	appointment_date(frm) {
+		if (!enforce_future_appointment_date(frm, 'appointment_date')) return;
+		reset_appointment_time(frm);
 		trigger_slot_dialog(frm);
 	}
 });
+
+function apply_appointment_date_rules(frm) {
+	const field = frm.fields_dict.appointment_date;
+	const today = frappe.datetime.get_today();
+
+	if (field?.datepicker?.update) {
+		field.datepicker.update({ minDate: today });
+	}
+}
 
 
 // -----------------------------
@@ -69,6 +82,26 @@ function set_patient_values(frm) {
 	});
 }
 
+function enforce_future_appointment_date(frm, fieldname) {
+	const value = frm.doc[fieldname];
+	if (!value) return true;
+
+	const today = frappe.datetime.get_today();
+	if (value < today) {
+		frappe.msgprint(__("Appointment date cannot be in the past."));
+		frm.set_value(fieldname, null);
+		return false;
+	}
+
+	return true;
+}
+
+function reset_appointment_time(frm) {
+	if (frm.doc.appointment_time) {
+		frm.set_value('appointment_time', null);
+	}
+}
+
 
 // -----------------------------
 // AUTO SLOT POPUP
@@ -97,6 +130,7 @@ function trigger_slot_dialog(frm) {
 // SLOT DIALOG
 // -----------------------------
 function open_slot_dialog(frm) {
+	if (!enforce_future_appointment_date(frm, 'appointment_date')) return;
 
 	frappe.call({
 		method: "clinic_appointments.api.setup.get_available_slots",
