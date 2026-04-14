@@ -1,8 +1,9 @@
+from datetime import datetime
+
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import getdate, get_time
-from datetime import datetime
+from frappe.utils import get_datetime, get_time, getdate, now_datetime
 
 ACTIVE_STATUSES = {"Draft", "Scheduled", "Confirmed", "Checked In", "Consulted"}
 
@@ -46,6 +47,7 @@ class ClinicAppointment(Document):
         if self.duplicate_override and not self.duplicate_override_reason:
             frappe.throw(_("Duplicate Override Reason is required."))
 
+        validate_future_appointment(self)
         validate_duplicate_patient(self)
         validate_doctor_conflict(self)
         validate_slot_available(self)
@@ -56,6 +58,21 @@ class ClinicAppointment(Document):
 # -----------------------------
 # VALIDATIONS
 # -----------------------------
+
+def validate_future_appointment(doc):
+    if not doc.appointment_date:
+        return
+
+    appointment_date = getdate(doc.appointment_date)
+    today = getdate(now_datetime())
+
+    if appointment_date < today:
+        frappe.throw(_("Appointment date cannot be in the past."))
+
+    if doc.appointment_time:
+        appointment_datetime = get_datetime(f"{appointment_date} {doc.appointment_time}")
+        if appointment_datetime < now_datetime():
+            frappe.throw(_("Appointment time cannot be in the past."))
 
 def validate_duplicate_patient(doc):
     filters = {
