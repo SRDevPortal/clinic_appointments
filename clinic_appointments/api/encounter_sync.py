@@ -30,7 +30,10 @@ def _is_online_appointment(encounter) -> bool:
 
 
 def _should_sync_clinic_appointment(encounter) -> bool:
+    encounter_type = (getattr(encounter, "sr_encounter_type", None) or "").strip()
     place = (getattr(encounter, "sr_encounter_place", None) or "").strip()
+    if encounter_type != "Appointment":
+        return False
     if place == "OPD":
         return True
     return _is_online_appointment(encounter)
