@@ -22,7 +22,7 @@ frappe.ui.form.on("Patient Encounter", {
 
 function apply_appointment_date_rules(frm) {
     const field = frm.fields_dict.pe_appointment_date;
-    const today = frappe.datetime.get_today();
+    const today = frappe.datetime.str_to_obj(frappe.datetime.get_today());
 
     if (field?.datepicker?.update) {
         field.datepicker.update({ minDate: today });
