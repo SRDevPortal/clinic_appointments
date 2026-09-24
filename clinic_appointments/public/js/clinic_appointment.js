@@ -43,9 +43,13 @@ function set_patient_values(frm) {
 
 	// 🔴 Handle patient removed
 	if (!frm.doc.patient) {
+        frm.set_df_property('mobile_number', 'reqd', 1);
 		frm.set_value({
 			patient_name: '',
 			mobile_number: '',
+            alternate_mobile: '',
+            mask_mobile: '',
+            mask_alternate_mobile: '',
 			patient_gender: '',
 			patient_id: '',
 			department: ''
@@ -54,29 +58,44 @@ function set_patient_values(frm) {
 	}
 
 	// 🟢 Fetch minimal data (fast)
-	frappe.db.get_value('Patient', frm.doc.patient, [
-		'patient_name',
-		'mobile',
-		'sex',
-		'sr_patient_id',
-		'sr_medical_department'
-	]).then(r => {
+    const patient = frm.doc.patient;
+    const previous_patient = frm.__privacy_patient_source;
+    frm.__privacy_patient_source = patient;
+    frappe.call({
+        method: 'clinic_appointments.api.patient_details.get_patient_details',
+        args: { patient }
+    }).then(r => {
+        if (frm.doc.patient !== patient) return;
+        const p = r.message || {};
+        // Originals are resolved in server validation; never copy display masks.
+        frm.set_df_property('mobile_number', 'reqd', p.resolve_numbers_on_server ? 0 : 1);
+        const changed_patient = previous_patient && previous_patient !== patient;
+        const resolve_changed = changed_patient && frm.doc.__privacy_shield && !frm.doc.__privacy_shield.edit_original;
+        const values = {
+            patient_name: (changed_patient ? p.patient_name : frm.doc.patient_name || p.patient_name) || '',
+            patient_gender: p.sex || '',
+            patient_id: p.sr_patient_id || '',
+            department: p.sr_medical_department || ''
+        };
+        if (p.resolve_numbers_on_server) {
+            values.mask_mobile = p.mask_mobile || '';
+            values.mask_alternate_mobile = p.mask_phone || '';
+            // Existing scoped forms omit originals. Backend resolves a changed
+            // Patient; do not submit masks or stale copies as new source values.
 
-		let p = r.message || {};
-
-		frm.set_value({
-			// 🧠 do not override if already typed
-			patient_name: frm.doc.patient_name || p.patient_name || '',
-			mobile_number: frm.doc.mobile_number || p.mobile || '',
-            alternate_mobile: frm.doc.alternate_mobile || p.phone || '',
-
-			// always update system fields
-			patient_gender: p.sex || '',
-			patient_id: p.sr_patient_id || '',
-			department: p.sr_medical_department || ''
-		});
-
-	});
+        }
+        if (resolve_changed) {
+            delete frm.doc.mobile_number;
+            delete frm.doc.alternate_mobile;
+            frm.refresh_field('mobile_number');
+            frm.refresh_field('alternate_mobile');
+        }
+        if (!p.resolve_numbers_on_server && !resolve_changed) {
+            values.mobile_number = (changed_patient ? p.mobile : frm.doc.mobile_number || p.mobile) || '';
+            values.alternate_mobile = (changed_patient ? p.phone : frm.doc.alternate_mobile || p.phone) || '';
+        }
+        frm.set_value(values);
+    });
 }
 
 function enforce_future_appointment_date(frm, fieldname) {
@@ -141,7 +160,7 @@ function open_slot_dialog(frm) {
 			let isBooked = data.booked_slots.includes(slot);
 
 			html += `
-				<button 
+				<button
 					class="slot-btn"
 					data-slot="${slot}"
 					style="

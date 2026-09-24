@@ -75,6 +75,12 @@ def create_appointment_from_encounter(data):
         frappe.throw("Encounter is required")
 
     encounter_doc = frappe.get_doc("Patient Encounter", encounter)
+    # This action writes a linked appointment with elevated permissions.
+    # Authorize the source before reading/mutating any appointment details.
+    encounter_doc.check_permission("read")
+    encounter_doc.check_permission("write")
+    if data.get("patient") and data["patient"] != encounter_doc.patient:
+        frappe.throw("Appointment patient must match the encounter", frappe.PermissionError)
 
     practitioner = data.get("practitioner") or encounter_doc.pe_practitioner
     date = data.get("appointment_date")
