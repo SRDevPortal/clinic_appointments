@@ -60,6 +60,18 @@ class ClinicAppointment(Document):
 # -----------------------------
 
 def validate_future_appointment(doc):
+    # Existing appointments can receive payments/status updates after their slot.
+    # Missing snapshots deliberately keep validation enabled (fail closed).
+    previous = doc.get_doc_before_save() if not doc.is_new() else None
+    if previous:
+        same_date = (
+            getdate(previous.appointment_date) if previous.appointment_date else None
+        ) == (getdate(doc.appointment_date) if doc.appointment_date else None)
+        same_time = (
+            get_time(previous.appointment_time) if previous.appointment_time not in (None, "") else None
+        ) == (get_time(doc.appointment_time) if doc.appointment_time not in (None, "") else None)
+        if same_date and same_time:
+            return
     if not doc.appointment_date:
         return
 
