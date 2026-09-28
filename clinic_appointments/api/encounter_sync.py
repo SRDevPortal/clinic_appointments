@@ -10,6 +10,19 @@ from clinic_appointments.utils.sync_mapper import build_appointment_payload_from
 
 def _derive_appointment_status(encounter):
     status = (getattr(encounter, "sr_encounter_status", None) or "").strip()
+    if status in ("Cancelled", "Completed"):
+        return status
+    # The calendar owns visit progress once an agent has made a decision.
+    # Preserve it when the encounter is subsequently saved (notes/payments/etc.).
+    if frappe.db.exists("DocType", "Mobile Appointment Workflow"):
+        workflow_status = frappe.db.get_value("Mobile Appointment Workflow", {
+            "reference_doctype": "Patient Encounter", "reference_name": encounter.name,
+        }, "workflow_status")
+        mapped = {"Approved": "Confirmed", "Checked In": "Completed",
+                  "In Consultation": "Completed", "Completed": "Completed",
+                  "Rejected": "Cancelled", "Cancelled": "Cancelled"}.get(workflow_status)
+        if mapped:
+            return mapped
     if status:
         return status
     return "Draft"
