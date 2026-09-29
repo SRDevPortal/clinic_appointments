@@ -143,6 +143,15 @@ function open_slot_dialog(frm) {
                 // ✅ set time
                 frm.set_value("pe_appointment_time", selected_time).then(() => {
 
+                    // Browser-local encounters are booked by on_update after save.
+                    if (frm.is_new()) {
+                        frappe.show_alert({
+                            message: __("Time selected. Save the Encounter to book the appointment."),
+                            indicator: "blue"
+                        });
+                        return;
+                    }
+
                     // 🔥 CREATE / UPDATE APPOINTMENT
                     frappe.call({
                         method: "clinic_appointments.api.encounter.create_appointment_from_encounter",
