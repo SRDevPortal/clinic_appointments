@@ -61,7 +61,7 @@ function set_patient_values(frm) {
     const patient = frm.doc.patient;
     const previous_patient = frm.__privacy_patient_source;
     frm.__privacy_patient_source = patient;
-    frappe.call({
+    return frappe.call({
         method: 'clinic_appointments.api.patient_details.get_patient_details',
         args: { patient }
     }).then(r => {
